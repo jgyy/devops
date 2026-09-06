@@ -11,6 +11,8 @@ AWS (EKS) later while keeping cloud cost down.
 | `infra/local-kind/` | Local [kind](https://kind.sigs.k8s.io/) cluster defined in TypeScript with [CDK for Terraform](https://developer.hashicorp.com/terraform/cdktf) |
 | `docs/local-cluster.md` | How the local cluster works, prerequisites and usage |
 | `docs/TODO.md` | Planned add-ons (ingress, metrics-server, local registry, sample app) |
+| `docs/commands.md` | Terminal cheat sheet for exploring and operating the repo |
+| `docs/alternatives.md` | Alternative tools at each layer of the stack (local cluster, IaC, add-ons, cloud, CI/CD) |
 | `Makefile` | Entry point for common tasks (`make help`) |
 | `AGENTS.md` | Instructions for AI coding agents working in this repo |
 
