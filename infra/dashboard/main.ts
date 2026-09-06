@@ -72,6 +72,7 @@ export class DashboardStack extends TerraformStack {
       values: [JSON.stringify(grafanaValues(props, adminPassword.stringValue))],
       wait: true,
       timeout: 900,
+      dependsOn: [ns],
     });
 
     new TerraformOutput(this, "grafana_service", {
