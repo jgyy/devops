@@ -1,0 +1,9 @@
+{
+  "language": "typescript",
+  "app": "pnpm exec ts-node main.ts",
+  "projectId": "devops-dashboard",
+  "sendCrashReports": "false",
+  "terraformProviders": ["hashicorp/helm@~> 3.0", "hashicorp/kubernetes@~> 3.0"],
+  "terraformModules": [],
+  "context": {}
+}

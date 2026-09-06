@@ -3,7 +3,8 @@
  *
  * Every function here runs the same way on a laptop (`make ci`) and in
  * GitHub Actions (`dagger call ci`). The pipeline typechecks, unit-tests and
- * synthesizes the CDKTF stack in `infra/local-kind`; it never deploys.
+ * synthesizes the three CDKTF stacks (`infra/local-kind`, `infra/aws-kind`,
+ * `infra/dashboard`); it never deploys.
  */
 import {
   dag,
@@ -16,7 +17,9 @@ import {
 
 const NODE_IMAGE = "node:22-bookworm-slim"
 const TERRAFORM_IMAGE = "hashicorp/terraform:1.13"
-const STACK_DIR = "infra/local-kind"
+const DEFAULT_STACK_DIR = "infra/local-kind"
+/** Every CDKTF project the pipeline checks. */
+const STACK_DIRS = ["infra/local-kind", "infra/aws-kind", "infra/dashboard"]
 const WORKDIR = "/work"
 
 /** Paths under the repo root that must never enter the build context. */
@@ -40,14 +43,16 @@ export class Devops {
   @func()
   base(
     @argument({ defaultPath: "/", ignore: IGNORE }) source: Directory,
+    stackDir: string = DEFAULT_STACK_DIR,
   ): Container {
     const terraform = dag
       .container()
       .from(TERRAFORM_IMAGE)
       .file("/bin/terraform")
 
-    const stack = source.directory(STACK_DIR)
-
+    const stack = source.directory(stackDir)
+    // The dashboard stack reads its dashboards/ directory at synth time; the
+    // aws-kind stack refuses to synth without STATE_BUCKET (any value works).
     return dag
       .container()
       .from(NODE_IMAGE)
@@ -60,6 +65,7 @@ export class Devops {
       .withExec(["corepack", "enable", "pnpm"])
       .withEnvVariable("CI", "true")
       .withEnvVariable("CHECKPOINT_DISABLE", "1")
+      .withEnvVariable("STATE_BUCKET", "ci")
       .withMountedCache(
         "/root/.local/share/pnpm/store",
         dag.cacheVolume("devops-pnpm-store"),
@@ -69,7 +75,7 @@ export class Devops {
       .withExec(["pnpm", "install", "--frozen-lockfile"])
       .withMountedCache(
         `${WORKDIR}/.gen`,
-        dag.cacheVolume("devops-cdktf-gen"),
+        dag.cacheVolume(`devops-cdktf-gen-${stackDir.replace(/\//g, "-")}`),
       )
       .withExec(["pnpm", "exec", "cdktf", "get"])
   }
@@ -78,8 +84,9 @@ export class Devops {
   @func()
   async typecheck(
     @argument({ defaultPath: "/", ignore: IGNORE }) source: Directory,
+    stackDir: string = DEFAULT_STACK_DIR,
   ): Promise<string> {
-    return this.base(source)
+    return this.base(source, stackDir)
       .withExec(["pnpm", "exec", "tsc", "--noEmit"])
       .stdout()
   }
@@ -88,22 +95,25 @@ export class Devops {
   @func()
   async test(
     @argument({ defaultPath: "/", ignore: IGNORE }) source: Directory,
+    stackDir: string = DEFAULT_STACK_DIR,
   ): Promise<string> {
-    return this.base(source).withExec(["pnpm", "test"]).stdout()
+    return this.base(source, stackDir).withExec(["pnpm", "test"]).stdout()
   }
 
   /** Synthesize the Terraform configuration and return `cdktf.out`. */
   @func()
   synth(
     @argument({ defaultPath: "/", ignore: IGNORE }) source: Directory,
+    stackDir: string = DEFAULT_STACK_DIR,
   ): Directory {
-    return this.base(source)
+    return this.base(source, stackDir)
       .withExec(["pnpm", "exec", "cdktf", "synth"])
       .directory(`${WORKDIR}/cdktf.out`)
   }
 
   /**
-   * Run typecheck, test and synth concurrently. Fails if any step fails.
+   * Run typecheck, test and synth for every stack concurrently. Fails if any
+   * step fails.
    *
    * Strategy: run everything and surface every failure, rather than stopping at
    * the first one, so a single CI run shows the full picture.
@@ -112,10 +122,11 @@ export class Devops {
   async ci(
     @argument({ defaultPath: "/", ignore: IGNORE }) source: Directory,
   ): Promise<string> {
-    const steps: Record<string, Promise<unknown>> = {
-      typecheck: this.typecheck(source),
-      test: this.test(source),
-      synth: this.synth(source).sync(),
+    const steps: Record<string, Promise<unknown>> = {}
+    for (const stackDir of STACK_DIRS) {
+      steps[`${stackDir}:typecheck`] = this.typecheck(source, stackDir)
+      steps[`${stackDir}:test`] = this.test(source, stackDir)
+      steps[`${stackDir}:synth`] = this.synth(source, stackDir).sync()
     }
 
     const results = await Promise.allSettled(Object.values(steps))

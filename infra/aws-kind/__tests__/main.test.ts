@@ -5,6 +5,7 @@ import {
   AwsKindStack,
   BootstrapStack,
   CLUSTER_NAME,
+  DASHBOARD_READ_ACTIONS,
   INSTANCE_TYPE,
   REGION,
   userData,
@@ -97,6 +98,21 @@ describe("AwsKindStack", () => {
       "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
     );
     expect(instance.iam_instance_profile).toBeDefined();
+  });
+
+  it("lets pods reach IMDSv2 through the kind node container", () => {
+    expect(instance.metadata_options.http_put_response_hop_limit).toBe(3);
+  });
+
+  it("grants the dashboard read-only access to EC2, S3 and CloudWatch", () => {
+    const policy = firstResource(parsed, "aws_iam_role_policy");
+    const doc = JSON.parse(policy.policy);
+    expect(doc.Statement).toHaveLength(1);
+    expect(doc.Statement[0].Effect).toBe("Allow");
+    expect(doc.Statement[0].Action).toEqual(DASHBOARD_READ_ACTIONS);
+    for (const action of DASHBOARD_READ_ACTIONS) {
+      expect(action).toMatch(/^(ec2:Describe\*|s3:(ListAllMyBuckets|GetBucket\*)|cloudwatch:(GetMetricData|ListMetrics|GetMetricStatistics)|tag:GetResources|sts:GetCallerIdentity)$/);
+    }
   });
 
   it("exposes the lifetime as a variable that feeds the user data", () => {

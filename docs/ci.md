@@ -17,15 +17,23 @@ flowchart LR
     result -->|no| fail["CI failed: list of steps"]
 ```
 
+`ci` runs typecheck, test and synth for all three CDKTF stacks —
+`infra/local-kind`, `infra/aws-kind` and `infra/dashboard` — concurrently,
+one `base` container per stack.
+
 ## Functions
 
 | Function    | What it does                                                        |
 |-------------|---------------------------------------------------------------------|
-| `base`      | Builds the container all other steps share: Node 22, pnpm (pinned via `packageManager`), the Terraform CLI copied from the `hashicorp/terraform` image, `pnpm install --frozen-lockfile`, `cdktf get`. |
-| `typecheck` | `tsc --noEmit` on `infra/local-kind`.                               |
-| `test`      | `pnpm test` (jest).                                                 |
-| `synth`     | `cdktf synth`; returns the `cdktf.out` directory.                   |
-| `ci`        | Runs the three checks concurrently and reports every failing step.  |
+| `base`      | Builds the container all other steps share for a given stack (`stackDir`, default `infra/local-kind`): Node 22, pnpm (pinned via `packageManager`), the Terraform CLI copied from the `hashicorp/terraform` image, `pnpm install --frozen-lockfile`, `cdktf get`. Sets `STATE_BUCKET=ci` so `infra/aws-kind` can synth. |
+| `typecheck` | `tsc --noEmit` on the given `stackDir`.                             |
+| `test`      | `pnpm test` (jest) on the given `stackDir`.                         |
+| `synth`     | `cdktf synth` on the given `stackDir`; returns the `cdktf.out` directory. |
+| `ci`        | Runs typecheck, test and synth for `infra/local-kind`, `infra/aws-kind` and `infra/dashboard` concurrently (nine steps) and reports every failing one. |
+
+The single-step targets and functions take a stack directory: `dagger -m ci
+call typecheck --stack-dir infra/aws-kind`, or `make ci-typecheck
+STACK=infra/aws-kind` (defaults to `infra/local-kind`).
 
 The pnpm store and the generated `.gen/` provider bindings live in Dagger
 cache volumes, so repeat runs skip the install and provider download.

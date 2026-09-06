@@ -19,9 +19,8 @@ flowchart TB
 - [ ] **Ingress NGINX**: install the `ingress-nginx` Helm chart with
       `hostNetwork` or a NodePort bound to the 80/443 port mappings already on
       the control-plane node, so services are reachable at `http://localhost`.
-- [ ] **Metrics server**: install the `metrics-server` chart with
-      `--kubelet-insecure-tls` (kind uses self-signed kubelet certs) to enable
-      `kubectl top` and HorizontalPodAutoscaler practice.
+- [x] **Metrics**: covered by kube-prometheus-stack in `infra/dashboard` (see
+      `docs/dashboard.md`); `kubectl top` still needs metrics-server.
 - [ ] **Local container registry**: run a `registry:2` container on the kind
       Docker network and add a `containerdConfigPatches` entry so nodes can pull
       from `localhost:5001`. Useful for CI/CD without a remote registry.
@@ -68,9 +67,7 @@ Deferred additions to `infra/aws-kind/`.
       apply equally to `devops-aws`; the 80/443 port mappings are already in
       place. Install through the systemd unit's script or a helm/kubernetes
       provider pointed at the SSM tunnel.
-- [ ] **CI coverage**: parameterise `STACK_DIR` in `ci/src/index.ts` so
-      typecheck, test and synth also run for `infra/aws-kind` (synth needs a
-      `STATE_BUCKET` env var; any string works for synth).
+- [x] **CI coverage**: done, see `docs/ci.md`.
 - [ ] **Shared topology**: `nodeTopology()` in `local-kind` and the YAML in
       `userData()` describe the same nodes twice. A small shared package that
       emits both would keep them from drifting.
@@ -79,3 +76,14 @@ Deferred additions to `infra/aws-kind/`.
 - [ ] **Spot instance**: `instance_market_options { market_type = "spot" }` on
       the host would cut the hourly rate by roughly 60%, at the risk of the
       session being interrupted.
+
+## Dashboard
+
+Deferred additions to `infra/dashboard/`.
+
+- [ ] **Ingress**: serve Grafana at `http://localhost` / the EC2 public IP once
+      Ingress NGINX exists; needs a real password and TLS first.
+- [ ] **Whole-account inventory**: drop the `Project=devops` filter and add
+      IAM / Lambda / RDS tables; needs broader read-only IAM on the host role.
+- [ ] **Persistent Prometheus storage**: a PersistentVolume so metrics survive
+      pod restarts.
