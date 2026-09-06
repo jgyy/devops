@@ -1,10 +1,13 @@
 import "cdktf/lib/testing/adapters/jest";
 import { Testing } from "cdktf";
 import {
+  AWS_SECRET_NAME,
   CHART_VERSION,
   DashboardStack,
   NAMESPACE,
+  REGION,
   RELEASE_NAME,
+  STEAMPIPE_SECRET_NAME,
 } from "../main";
 
 const KUBECONFIG = "/tmp/test-kubeconfig";
@@ -78,5 +81,70 @@ describe("kube-prometheus-stack release", () => {
   it("takes the Grafana admin password from a variable", () => {
     expect(parsed.variable.grafana_admin_password.default).toBe("admin");
     expect(values.grafana.adminPassword).toBe("${var.grafana_admin_password}");
+  });
+});
+
+describe("AWS credentials", () => {
+  it("copies the CLI keys into a Secret on the local cluster", () => {
+    const { parsed } = synthLocal();
+    const secret = Object.values(parsed.resource.kubernetes_secret_v1 as any).find(
+      (s: any) => s.metadata.name === AWS_SECRET_NAME,
+    ) as any;
+    expect(secret.metadata.namespace).toBe(NAMESPACE);
+    expect(secret.data).toEqual({
+      AWS_ACCESS_KEY_ID: "${var.aws_access_key_id}",
+      AWS_SECRET_ACCESS_KEY: "${var.aws_secret_access_key}",
+      AWS_SESSION_TOKEN: "${var.aws_session_token}",
+    });
+    expect(parsed.variable.aws_access_key_id.sensitive).toBe(true);
+    expect(parsed.variable.aws_session_token.default).toBe("");
+    const values = JSON.parse(firstResource(parsed, "helm_release").values[0]);
+    expect(values.grafana.envFromSecrets.map((s: any) => s.name)).toEqual([
+      STEAMPIPE_SECRET_NAME,
+      AWS_SECRET_NAME,
+    ]);
+  });
+
+  it("relies on the instance role on the AWS cluster", () => {
+    const { parsed } = synthAws();
+    const names = Object.values(parsed.resource.kubernetes_secret_v1 as any).map(
+      (s: any) => s.metadata.name,
+    );
+    expect(names).not.toContain(AWS_SECRET_NAME);
+    expect(parsed.variable.aws_access_key_id).toBeUndefined();
+    const values = JSON.parse(firstResource(parsed, "helm_release").values[0]);
+    expect(values.grafana.envFromSecrets.map((s: any) => s.name)).toEqual([STEAMPIPE_SECRET_NAME]);
+  });
+});
+
+describe("Grafana datasources", () => {
+  const { parsed } = synthLocal();
+  const values = JSON.parse(firstResource(parsed, "helm_release").values[0]);
+  const sources = values.grafana.additionalDataSources as any[];
+
+  it("adds CloudWatch using the default credential chain", () => {
+    const cw = sources.find((s) => s.uid === "cloudwatch");
+    expect(cw).toMatchObject({
+      type: "cloudwatch",
+      jsonData: { authType: "default", defaultRegion: REGION },
+    });
+  });
+
+  it("adds Steampipe as a PostgreSQL datasource", () => {
+    const sp = sources.find((s) => s.uid === "steampipe");
+    expect(sp).toMatchObject({
+      type: "grafana-postgresql-datasource",
+      url: `steampipe.${NAMESPACE}.svc:9193`,
+      user: "steampipe",
+      jsonData: { database: "steampipe", sslmode: "disable" },
+      secureJsonData: { password: "$STEAMPIPE_DATABASE_PASSWORD" },
+    });
+  });
+
+  it("stores the Steampipe password in a Secret Grafana reads as env", () => {
+    const secret = Object.values(parsed.resource.kubernetes_secret_v1 as any).find(
+      (s: any) => s.metadata.name === STEAMPIPE_SECRET_NAME,
+    ) as any;
+    expect(secret.data).toEqual({ STEAMPIPE_DATABASE_PASSWORD: "${var.steampipe_password}" });
   });
 });
