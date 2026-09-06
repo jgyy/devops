@@ -28,7 +28,6 @@ local-status: ## Show nodes of the local kind cluster
 local-down: ## Destroy the local kind cluster
 	cd $(KIND_DIR) && pnpm exec cdktf destroy --auto-approve
 
-
 CI_DIR := ci
 export DAGGER_NO_NAG := 1
 
