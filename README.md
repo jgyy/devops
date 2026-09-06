@@ -9,6 +9,9 @@ AWS (EKS) later while keeping cloud cost down.
 | Path | Purpose |
 | --- | --- |
 | `infra/local-kind/` | Local [kind](https://kind.sigs.k8s.io/) cluster defined in TypeScript with [CDK for Terraform](https://developer.hashicorp.com/terraform/cdktf) |
+| `ci/` | [Dagger](https://dagger.io) TypeScript module that typechecks, tests and synthesizes the stack; used by `make ci` and GitHub Actions |
+| `.github/workflows/ci.yml` | Thin GitHub Actions shim that runs the Dagger module on push and pull request |
+| `docs/ci.md` | How the CI pipeline works and how to run it locally |
 | `docs/local-cluster.md` | How the local cluster works, prerequisites and usage |
 | `docs/TODO.md` | Planned add-ons (ingress, metrics-server, local registry, sample app) |
 | `docs/commands.md` | Terminal cheat sheet for exploring and operating the repo |
@@ -60,6 +63,7 @@ make local-synth     # write Terraform JSON to cdktf.out/
 make local-up        # create the cluster
 make local-status    # kubectl get nodes using the generated kubeconfig
 make local-down      # destroy the cluster
+make ci              # same checks CI runs, via Dagger (see docs/ci.md)
 ```
 
 The generated kubeconfig lives at
@@ -78,7 +82,7 @@ cluster manually with `kind delete cluster --name devops-local`.
 
 - Local cluster add-ons listed in [docs/TODO.md](docs/TODO.md)
 - EKS cluster on AWS defined with IaC
-- CI/CD pipeline deploying to the cluster
+- CI pipeline done ([docs/ci.md](docs/ci.md)); CD deploying to a cluster still to come
 - Automatic shutdown of cloud resources after a short idle window to control cost
 
 ## License

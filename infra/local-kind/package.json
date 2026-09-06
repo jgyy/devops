@@ -2,6 +2,7 @@
   "name": "local-kind",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.34.5",
   "description": "Local kind Kubernetes cluster defined with CDK for Terraform",
   "main": "main.js",
   "scripts": {
