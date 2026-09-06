@@ -4,6 +4,7 @@ KUBECONFIG_LOCAL := $(KIND_DIR)/cdktf.out/stacks/local-kind/devops-local-config
 AWS_DIR := infra/aws-kind
 AWS_REGION ?= ap-southeast-1
 KUBECONFIG_AWS := $(AWS_DIR)/kubeconfig
+DASH_DIR := infra/dashboard
 # Bucket name is derived from the account so it is globally unique and needs no config.
 STATE_BUCKET ?= devops-tfstate-$(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
 # Looked up by tag so no Terraform output parsing is needed; empty when nothing is deployed.
@@ -17,6 +18,7 @@ export NODE_OPTIONS := --no-experimental-webstorage --max-old-space-size=4096
 .PHONY: help local-install local-test local-synth local-up local-down local-status \
 	aws-install aws-test aws-synth aws-bootstrap aws-up aws-down aws-start aws-stop \
 	aws-tunnel aws-kubeconfig aws-status \
+	dashboard-install dashboard-test dashboard-synth \
 	ci ci-typecheck ci-test ci-synth
 
 help: ## Show this help
@@ -81,6 +83,15 @@ aws-kubeconfig: ## Fetch the cluster kubeconfig via SSM into infra/aws-kind/kube
 
 aws-status: ## Show nodes of the AWS kind cluster (needs aws-tunnel running)
 	kubectl --kubeconfig $(KUBECONFIG_AWS) get nodes -o wide
+
+dashboard-install: ## Install deps and fetch CDKTF providers for the dashboard stack
+	cd $(DASH_DIR) && pnpm install && pnpm exec cdktf get
+
+dashboard-test: ## Run the dashboard stack unit tests
+	cd $(DASH_DIR) && pnpm test
+
+dashboard-synth: ## Synthesize Terraform config for both dashboard stacks
+	cd $(DASH_DIR) && pnpm exec cdktf synth
 
 CI_DIR := ci
 export DAGGER_NO_NAG := 1
