@@ -1,0 +1,9 @@
+{
+  "language": "typescript",
+  "app": "npx ts-node main.ts",
+  "projectId": "devops-local-kind",
+  "sendCrashReports": "false",
+  "terraformProviders": ["tehcyx/kind@~> 0.9"],
+  "terraformModules": [],
+  "context": {}
+}
