@@ -66,8 +66,8 @@ Same toolchain and layout as `infra/local-kind`: pnpm, ts-node, jest,
 - copies the kubeconfig to `/etc/kind/kubeconfig` (server stays
   `https://127.0.0.1:6443`).
 
-The script runs on every boot (cloud-init `#cloud-boothook`-free approach: a
-systemd oneshot unit written by user data, `kind-cluster.service`, so a
+The script runs on every boot: user data installs a
+systemd oneshot unit, `kind-cluster.service`, that recreates the cluster and reschedules the stop, so a
 `make aws-start` after the auto-stop gets a fresh cluster and a fresh timer.
 
 ### Reaching the cluster
