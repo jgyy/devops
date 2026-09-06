@@ -34,6 +34,7 @@ kind-config-*.yaml
 .env
 .env.*
 !.env.example
+kind-logs/
 
 # --- Editors / OS ---
 .vscode/
