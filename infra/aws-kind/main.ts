@@ -23,6 +23,7 @@ import { VpcSecurityGroupIngressRule } from "./.gen/providers/aws/vpc-security-g
 import { VpcSecurityGroupEgressRule } from "./.gen/providers/aws/vpc-security-group-egress-rule";
 import { IamRole } from "./.gen/providers/aws/iam-role";
 import { IamRolePolicyAttachment } from "./.gen/providers/aws/iam-role-policy-attachment";
+import { IamRolePolicy } from "./.gen/providers/aws/iam-role-policy";
 import { IamInstanceProfile } from "./.gen/providers/aws/iam-instance-profile";
 import { Instance } from "./.gen/providers/aws/instance";
 
@@ -35,6 +36,22 @@ export const KIND_VERSION = "v0.32.0";
 const AL2023_AMI_PARAMETER =
   "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64";
 const SSM_CORE_POLICY = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore";
+
+/**
+ * Read-only actions the in-cluster dashboard (Grafana CloudWatch datasource
+ * and Steampipe) needs. Scoped by hand instead of `ReadOnlyAccess` so the host
+ * cannot read anything the dashboard does not show.
+ */
+export const DASHBOARD_READ_ACTIONS = [
+  "ec2:Describe*",
+  "s3:ListAllMyBuckets",
+  "s3:GetBucket*",
+  "cloudwatch:GetMetricData",
+  "cloudwatch:ListMetrics",
+  "cloudwatch:GetMetricStatistics",
+  "tag:GetResources",
+  "sts:GetCallerIdentity",
+];
 
 const TAGS = { Project: "devops", Stack: "aws-kind" };
 
@@ -263,6 +280,16 @@ export class AwsKindStack extends TerraformStack {
       role: role.name,
       policyArn: SSM_CORE_POLICY,
     });
+
+    new IamRolePolicy(this, "dashboard_read", {
+      name: `${CLUSTER_NAME}-dashboard-read`,
+      role: role.id,
+      policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [{ Effect: "Allow", Action: DASHBOARD_READ_ACTIONS, Resource: "*" }],
+      }),
+    });
+
     const profile = new IamInstanceProfile(this, "profile", {
       name: `${CLUSTER_NAME}-host`,
       role: role.name,
@@ -282,7 +309,9 @@ export class AwsKindStack extends TerraformStack {
       userData: userData(lifetime.stringValue),
       userDataReplaceOnChange: true,
       instanceInitiatedShutdownBehavior: "stop",
-      metadataOptions: { httpTokens: "required", httpEndpoint: "enabled" },
+      // Pods run inside a kind node container inside Docker: two routed hops
+      // from the host, so the default hop limit of 1 blocks IMDS for them.
+      metadataOptions: { httpTokens: "required", httpEndpoint: "enabled", httpPutResponseHopLimit: 3 },
       rootBlockDevice: { volumeSize: 30, volumeType: "gp3", deleteOnTermination: true },
       tags: { Name: `${CLUSTER_NAME}-host` },
     });
