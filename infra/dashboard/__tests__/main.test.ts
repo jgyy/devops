@@ -7,6 +7,8 @@ import {
   NAMESPACE,
   REGION,
   RELEASE_NAME,
+  STEAMPIPE_IMAGE,
+  STEAMPIPE_PORT,
   STEAMPIPE_SECRET_NAME,
 } from "../main";
 
@@ -146,5 +148,47 @@ describe("Grafana datasources", () => {
       (s: any) => s.metadata.name === STEAMPIPE_SECRET_NAME,
     ) as any;
     expect(secret.data).toEqual({ STEAMPIPE_DATABASE_PASSWORD: "${var.steampipe_password}" });
+  });
+});
+
+describe("Steampipe", () => {
+  const { parsed } = synthLocal();
+  const deployment = firstResource(parsed, "kubernetes_deployment_v1");
+  const container = deployment.spec.template.spec.container[0];
+
+  it("runs the pinned image, installs the aws plugin and listens on the network", () => {
+    expect(container.image).toBe(STEAMPIPE_IMAGE);
+    expect(container.command.join(" ")).toContain("steampipe plugin install aws");
+    expect(container.command.join(" ")).toContain("--database-listen network");
+    expect(container.port[0].container_port).toBe(STEAMPIPE_PORT);
+    expect(container.readiness_probe.tcp_socket.port).toBe(String(STEAMPIPE_PORT));
+  });
+
+  it("takes its password from the shared Secret and the region from the ConfigMap", () => {
+    const env = container.env.find((e: any) => e.name === "STEAMPIPE_DATABASE_PASSWORD");
+    expect(env.value_from.secret_key_ref).toEqual({
+      name: STEAMPIPE_SECRET_NAME,
+      key: "STEAMPIPE_DATABASE_PASSWORD",
+    });
+    const cm = firstResource(parsed, "kubernetes_config_map_v1");
+    expect(cm.metadata.name).toBe("steampipe-config");
+    expect(cm.data["aws.spc"]).toContain(`regions = ["${REGION}"]`);
+    expect(container.volume_mount[0]).toMatchObject({
+      mount_path: "/home/steampipe/.steampipe/config/aws.spc",
+      sub_path: "aws.spc",
+    });
+  });
+
+  it("injects AWS keys only on the local cluster", () => {
+    expect(container.env_from[0].secret_ref.name).toBe(AWS_SECRET_NAME);
+    const aws = firstResource(synthAws().parsed, "kubernetes_deployment_v1");
+    expect(aws.spec.template.spec.container[0].env_from).toBeUndefined();
+  });
+
+  it("exposes a Service Grafana can reach by name", () => {
+    const svc = firstResource(parsed, "kubernetes_service_v1");
+    expect(svc.metadata.name).toBe("steampipe");
+    expect(svc.spec.selector).toEqual({ app: "steampipe" });
+    expect(svc.spec.port[0]).toMatchObject({ port: STEAMPIPE_PORT, target_port: String(STEAMPIPE_PORT) });
   });
 });

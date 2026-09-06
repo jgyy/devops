@@ -3,9 +3,12 @@ import { App, TerraformOutput, TerraformStack, TerraformVariable } from "cdktf";
 import { Construct } from "constructs";
 import { HelmProvider } from "./.gen/providers/helm/provider";
 import { Release } from "./.gen/providers/helm/release";
+import { ConfigMapV1 } from "./.gen/providers/kubernetes/config-map-v1";
+import { DeploymentV1 } from "./.gen/providers/kubernetes/deployment-v1";
 import { KubernetesProvider } from "./.gen/providers/kubernetes/provider";
 import { NamespaceV1 } from "./.gen/providers/kubernetes/namespace-v1";
 import { SecretV1 } from "./.gen/providers/kubernetes/secret-v1";
+import { ServiceV1 } from "./.gen/providers/kubernetes/service-v1";
 
 export const REGION = "ap-southeast-1";
 export const NAMESPACE = "dashboard";
@@ -15,6 +18,7 @@ const CHART_REPO = "https://prometheus-community.github.io/helm-charts";
 export const AWS_SECRET_NAME = "aws-credentials";
 export const STEAMPIPE_SECRET_NAME = "steampipe-db";
 export const STEAMPIPE_PORT = 9193;
+export const STEAMPIPE_IMAGE = "turbot/steampipe:0.22.0";
 
 /** Where the two cluster stacks leave their kubeconfigs, relative to this file. */
 export const KUBECONFIG_LOCAL = path.resolve(
@@ -79,6 +83,15 @@ export function grafanaValues(props: DashboardStackProps, adminPassword: string)
   };
 }
 
+/**
+ * Steampipe turns AWS APIs into Postgres tables. One connection, one region;
+ * credentials come from the environment (local) or IMDS (AWS), so no profile
+ * is configured here.
+ */
+export function steampipeConfig(): string {
+  return ['connection "aws" {', '  plugin  = "aws"', `  regions = ["${REGION}"]`, "}", ""].join("\n");
+}
+
 export class DashboardStack extends TerraformStack {
   constructor(scope: Construct, id: string, props: DashboardStackProps) {
     super(scope, id);
@@ -131,6 +144,76 @@ export class DashboardStack extends TerraformStack {
         dependsOn: [ns],
       });
     }
+
+    const labels = { app: "steampipe" };
+    const config = new ConfigMapV1(this, "steampipe_config", {
+      metadata: { name: "steampipe-config", namespace: NAMESPACE },
+      data: { "aws.spc": steampipeConfig() },
+      dependsOn: [ns],
+    });
+
+    new DeploymentV1(this, "steampipe", {
+      metadata: { name: "steampipe", namespace: NAMESPACE, labels },
+      spec: {
+        replicas: "1",
+        selector: { matchLabels: labels },
+        template: {
+          metadata: { labels },
+          spec: {
+            container: [
+              {
+                name: "steampipe",
+                image: STEAMPIPE_IMAGE,
+                // The plugin is fetched at start so the image stays stock; it
+                // is cached for the life of the pod only, which is fine here.
+                command: [
+                  "sh",
+                  "-c",
+                  `steampipe plugin install aws && exec steampipe service start --foreground --database-listen network --database-port ${STEAMPIPE_PORT}`,
+                ],
+                env: [
+                  { name: "AWS_REGION", value: REGION },
+                  {
+                    name: "STEAMPIPE_DATABASE_PASSWORD",
+                    valueFrom: {
+                      secretKeyRef: { name: STEAMPIPE_SECRET_NAME, key: "STEAMPIPE_DATABASE_PASSWORD" },
+                    },
+                  },
+                ],
+                ...(props.awsCredentials === "secret"
+                  ? { envFrom: [{ secretRef: { name: AWS_SECRET_NAME } }] }
+                  : {}),
+                port: [{ containerPort: STEAMPIPE_PORT, name: "postgres" }],
+                readinessProbe: {
+                  tcpSocket: { port: String(STEAMPIPE_PORT) },
+                  initialDelaySeconds: 30,
+                  periodSeconds: 10,
+                },
+                resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "1Gi" } },
+                volumeMount: [
+                  {
+                    name: "config",
+                    mountPath: "/home/steampipe/.steampipe/config/aws.spc",
+                    subPath: "aws.spc",
+                  },
+                ],
+              },
+            ],
+            volume: [{ name: "config", configMap: { name: config.metadata.name } }],
+          },
+        },
+      },
+      dependsOn: [ns],
+    });
+
+    new ServiceV1(this, "steampipe_service", {
+      metadata: { name: "steampipe", namespace: NAMESPACE },
+      spec: {
+        selector: labels,
+        port: [{ name: "postgres", port: STEAMPIPE_PORT, targetPort: String(STEAMPIPE_PORT) }],
+      },
+      dependsOn: [ns],
+    });
 
     new Release(this, "kube_prometheus_stack", {
       name: RELEASE_NAME,
