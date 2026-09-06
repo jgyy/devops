@@ -31,6 +31,27 @@ installed globally.
    printed as the `kubeconfig_path` output). Either pass it with
    `--kubeconfig` or export `KUBECONFIG=$(pwd)/infra/local-kind/cdktf.out/stacks/local-kind/devops-local-config`.
 
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant CDKTF as cdktf CLI
+    participant TF as Terraform
+    participant Prov as tehcyx/kind provider
+    participant Kind as kind
+    participant Docker
+
+    Dev->>CDKTF: make local-up (cdktf deploy)
+    CDKTF->>CDKTF: run main.ts, write cdktf.out/
+    CDKTF->>TF: terraform apply
+    TF->>Prov: create kind_cluster "devops-local"
+    Prov->>Kind: kind create cluster --config ...
+    Kind->>Docker: start control-plane + 2 worker containers
+    Kind-->>Prov: cluster ready (wait_for_ready)
+    Prov-->>TF: kubeconfig_path, endpoint
+    TF-->>Dev: outputs + local tfstate
+    Dev->>Docker: kubectl --kubeconfig devops-local-config
+```
+
 ## Usage
 
 ```sh

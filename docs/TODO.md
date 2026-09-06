@@ -5,6 +5,17 @@ construct in `infra/local-kind/main.ts`, most likely via the `hashicorp/helm`
 or `hashicorp/kubernetes` CDKTF provider pointed at the kubeconfig the kind
 cluster resource outputs.
 
+```mermaid
+flowchart TB
+    cluster["kind_cluster (exists)"] -->|kubeconfig| helm["helm / kubernetes provider"]
+    helm --> ingress["Ingress NGINX<br/>NodePort / hostNetwork on :80 :443"]
+    helm --> metrics["metrics-server<br/>--kubelet-insecure-tls"]
+    registry["registry:2 container<br/>localhost:5001"] -.->|containerdConfigPatches| cluster
+    ingress --> app["Sample app<br/>Deployment + Service + Ingress"]
+    registry -.->|image pull| app
+    browser["http://localhost"] --> ingress
+```
+
 - [ ] **Ingress NGINX**: install the `ingress-nginx` Helm chart with
       `hostNetwork` or a NodePort bound to the 80/443 port mappings already on
       the control-plane node, so services are reachable at `http://localhost`.

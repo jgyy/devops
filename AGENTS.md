@@ -29,6 +29,15 @@ Expose the ingress ports on the host so the local cluster
 can be reached without a port-forward.
 ```
 
+```mermaid
+flowchart TD
+    draft["Draft commit message"] --> check{"Contains Co-Authored-By,<br/>Claude-Session, session URL,<br/>or tool attribution?"}
+    check -->|yes| strip["Strip the trailer"] --> check
+    check -->|no| subject{"Conventional subject,<br/>imperative, < 72 chars?"}
+    subject -->|no| fix["Rewrite subject"] --> subject
+    subject -->|yes| commit["git commit"]
+```
+
 Before running `git commit`, re-read the message and strip any trailer listed above.
 The same rule applies to pull request descriptions: no tool attribution, no session URLs.
 
