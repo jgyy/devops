@@ -10,11 +10,13 @@ the same cluster on AWS while keeping cloud cost down.
 | --- | --- |
 | `infra/local-kind/` | Local [kind](https://kind.sigs.k8s.io/) cluster defined in TypeScript with [CDK for Terraform](https://developer.hashicorp.com/terraform/cdktf) |
 | `infra/aws-kind/` | The same kind cluster on one EC2 instance in `ap-southeast-1` that stops itself after an hour; CDKTF with the AWS provider and S3 state |
+| `infra/dashboard/` | Grafana + Steampipe installed into either cluster to show Kubernetes and AWS resources side by side; CDKTF with the helm and kubernetes providers |
 | `ci/` | [Dagger](https://dagger.io) TypeScript module that typechecks, tests and synthesizes the stack; used by `make ci` and GitHub Actions |
 | `.github/workflows/ci.yml` | Thin GitHub Actions shim that runs the Dagger module on push and pull request |
 | `docs/ci.md` | How the CI pipeline works and how to run it locally |
 | `docs/local-cluster.md` | How the local cluster works, prerequisites and usage |
 | `docs/aws-cluster.md` | How the AWS cluster works, how to reach it through SSM, and what it costs |
+| `docs/dashboard.md` | How the in-cluster Grafana dashboard is built and what it shows |
 | `docs/TODO.md` | Planned add-ons (ingress, metrics-server, local registry, sample app) |
 | `docs/commands.md` | Terminal cheat sheet for exploring and operating the repo |
 | `docs/alternatives.md` | Alternative tools at each layer of the stack (local cluster, IaC, add-ons, cloud, CI/CD) |

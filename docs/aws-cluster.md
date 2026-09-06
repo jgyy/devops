@@ -44,9 +44,11 @@ Everything in `docs/local-cluster.md` plus:
    - a security group that allows inbound 80 and 443 only. No port 22 and no
      6443: SSH is replaced by SSM Session Manager, and the API server is only
      reachable through an SSM port-forward;
-   - an IAM role with `AmazonSSMManagedInstanceCore` and an instance profile;
+   - an IAM role with `AmazonSSMManagedInstanceCore`, a read-only inline policy
+     for the dashboard (see `docs/dashboard.md`), and an instance profile;
    - one `t3a.large` (2 vCPU, 8 GB) Amazon Linux 2023 instance with a 30 GB
-     gp3 root volume, IMDSv2 required, and `instance_initiated_shutdown_behavior = stop`.
+     gp3 root volume, IMDSv2 required with a hop limit of 3 so pods can use the
+     instance role, and `instance_initiated_shutdown_behavior = stop`.
 3. The instance's user data (`userData()` in `main.ts`) runs on first boot. Its
    first line is `shutdown -h +60`, so the stop is scheduled before anything
    can fail. It then installs a systemd oneshot unit, `kind-cluster.service`,

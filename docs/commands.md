@@ -26,6 +26,7 @@ flowchart LR
 | `cat AGENTS.md` | Rules for AI coding agents, including the commit-message policy |
 | `cat docs/local-cluster.md` | How the kind cluster is built, prerequisites, usage |
 | `cat docs/aws-cluster.md` | How the AWS copy of the cluster is built, reached through SSM, and what it costs |
+| `cat docs/dashboard.md` | How the in-cluster Grafana dashboard is built and what it shows |
 | `cat docs/TODO.md` | Planned add-ons (ingress, metrics-server, registry, sample app) |
 | `git log --oneline` | Commit history |
 | `git status` | Working-tree state |
@@ -122,6 +123,22 @@ export KUBECONFIG=$(pwd)/infra/local-kind/cdktf.out/stacks/local-kind/devops-loc
 | `docker port devops-local-control-plane` | Verifies the 80/443 host port mappings |
 | `docker exec -it devops-local-control-plane crictl images` | Images cached on a node |
 | `kubectl top nodes` | Only works once metrics-server from `docs/TODO.md` is installed |
+
+## Dashboard (`infra/dashboard/`)
+
+```sh
+make dashboard-install     # pnpm install + cdktf get (helm + kubernetes providers)
+make dashboard-test        # jest
+make dashboard-synth       # cdktf synth -> cdktf.out/stacks/dashboard-{local,aws}
+make dashboard-local-up    # deploy to devops-local with your AWS CLI credentials
+make dashboard-aws-up      # deploy to devops-aws through the SSM tunnel
+make dashboard-open        # port-forward Grafana to http://localhost:3000 (TARGET=aws for the AWS cluster)
+```
+
+| Command | What it shows |
+| --- | --- |
+| `kubectl -n dashboard get pods` | Grafana, Prometheus, kube-state-metrics, node-exporter and Steampipe pods |
+| `kubectl -n dashboard exec -it deploy/steampipe -- steampipe query "select instance_id, instance_state from aws_ec2_instance"` | Ad-hoc AWS inventory through Steampipe |
 
 ## Troubleshooting
 

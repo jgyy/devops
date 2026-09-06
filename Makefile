@@ -19,6 +19,7 @@ export NODE_OPTIONS := --no-experimental-webstorage --max-old-space-size=4096
 	aws-install aws-test aws-synth aws-bootstrap aws-up aws-down aws-start aws-stop \
 	aws-tunnel aws-kubeconfig aws-status \
 	dashboard-install dashboard-test dashboard-synth \
+	dashboard-local-up dashboard-local-down dashboard-aws-up dashboard-aws-down dashboard-open \
 	ci ci-typecheck ci-test ci-synth
 
 help: ## Show this help
@@ -92,6 +93,32 @@ dashboard-test: ## Run the dashboard stack unit tests
 
 dashboard-synth: ## Synthesize Terraform config for both dashboard stacks
 	cd $(DASH_DIR) && pnpm exec cdktf synth
+
+# The local cluster gets your AWS CLI credentials copied into a Secret. The
+# export fails fast when no profile is configured, before Terraform runs.
+dashboard-local-up: ## Install the dashboard on the local cluster (uses your AWS CLI credentials)
+	@eval "$$(aws configure export-credentials --format env)" && cd $(DASH_DIR) && \
+	TF_VAR_aws_access_key_id="$$AWS_ACCESS_KEY_ID" \
+	TF_VAR_aws_secret_access_key="$$AWS_SECRET_ACCESS_KEY" \
+	TF_VAR_aws_session_token="$${AWS_SESSION_TOKEN:-}" \
+	pnpm exec cdktf deploy dashboard-local --auto-approve
+
+dashboard-local-down: ## Remove the dashboard from the local cluster
+	cd $(DASH_DIR) && \
+	TF_VAR_aws_access_key_id=x TF_VAR_aws_secret_access_key=x \
+	pnpm exec cdktf destroy dashboard-local --auto-approve
+
+dashboard-aws-up: ## Install the dashboard on the AWS cluster (needs aws-tunnel running; uses the instance role)
+	cd $(DASH_DIR) && pnpm exec cdktf deploy dashboard-aws --auto-approve
+
+dashboard-aws-down: ## Remove the dashboard from the AWS cluster (needs aws-tunnel running)
+	cd $(DASH_DIR) && pnpm exec cdktf destroy dashboard-aws --auto-approve
+
+TARGET ?= local
+DASH_KUBECONFIG = $(if $(filter aws,$(TARGET)),$(KUBECONFIG_AWS),$(KUBECONFIG_LOCAL))
+dashboard-open: ## Port-forward Grafana to http://localhost:3000 (TARGET=local|aws, login admin/admin)
+	@echo "Grafana: http://localhost:3000  (admin / admin)"
+	kubectl --kubeconfig $(DASH_KUBECONFIG) -n dashboard port-forward svc/kube-prometheus-stack-grafana 3000:80
 
 CI_DIR := ci
 export DAGGER_NO_NAG := 1
