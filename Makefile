@@ -5,9 +5,7 @@ AWS_DIR := infra/aws-kind
 AWS_REGION ?= ap-southeast-1
 KUBECONFIG_AWS := $(AWS_DIR)/kubeconfig
 DASH_DIR := infra/dashboard
-# Bucket name is derived from the account so it is globally unique and needs no config.
 STATE_BUCKET ?= devops-tfstate-$(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
-# Looked up by tag so no Terraform output parsing is needed; empty when nothing is deployed.
 AWS_INSTANCE_ID = $(shell aws ec2 describe-instances --region $(AWS_REGION) \
 	--filters Name=tag:Name,Values=devops-aws-host Name=instance-state-name,Values=pending,running,stopping,stopped \
 	--query 'Reservations[0].Instances[0].InstanceId' --output text)
@@ -94,8 +92,6 @@ dashboard-test: ## Run the dashboard stack unit tests
 dashboard-synth: ## Synthesize Terraform config for both dashboard stacks
 	cd $(DASH_DIR) && pnpm exec cdktf synth
 
-# The local cluster gets your AWS CLI credentials copied into a Secret. The
-# export fails fast when no profile is configured, before Terraform runs.
 dashboard-local-up: ## Install the dashboard on the local cluster (uses your AWS CLI credentials)
 	@eval "$$(aws configure export-credentials --format env)" && cd $(DASH_DIR) && \
 	TF_VAR_aws_access_key_id="$$AWS_ACCESS_KEY_ID" \
