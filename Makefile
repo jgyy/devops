@@ -122,15 +122,16 @@ dashboard-open: ## Port-forward Grafana to http://localhost:3000 (TARGET=local|a
 
 CI_DIR := ci
 export DAGGER_NO_NAG := 1
+STACK ?= infra/local-kind
 
-ci: ## Run the full CI pipeline (typecheck, test, synth) via Dagger
+ci: ## Run the full CI pipeline (typecheck, test, synth) for all stacks via Dagger
 	dagger -m $(CI_DIR) call ci
 
-ci-typecheck: ## Type-check the stack via Dagger
-	dagger -m $(CI_DIR) call typecheck
+ci-typecheck: ## Type-check one stack via Dagger (STACK=infra/aws-kind to pick another)
+	dagger -m $(CI_DIR) call typecheck --stack-dir $(STACK)
 
-ci-test: ## Run the unit tests via Dagger
-	dagger -m $(CI_DIR) call test
+ci-test: ## Run one stack's unit tests via Dagger (STACK=...)
+	dagger -m $(CI_DIR) call test --stack-dir $(STACK)
 
-ci-synth: ## Synthesize the stack via Dagger and export cdktf.out to ./ci/out
-	dagger -m $(CI_DIR) call synth export --path $(CI_DIR)/out
+ci-synth: ## Synthesize one stack via Dagger and export cdktf.out to ./ci/out (STACK=...)
+	dagger -m $(CI_DIR) call synth --stack-dir $(STACK) export --path $(CI_DIR)/out

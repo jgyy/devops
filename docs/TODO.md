@@ -67,9 +67,7 @@ Deferred additions to `infra/aws-kind/`.
       apply equally to `devops-aws`; the 80/443 port mappings are already in
       place. Install through the systemd unit's script or a helm/kubernetes
       provider pointed at the SSM tunnel.
-- [ ] **CI coverage**: parameterise `STACK_DIR` in `ci/src/index.ts` so
-      typecheck, test and synth also run for `infra/aws-kind` (synth needs a
-      `STATE_BUCKET` env var; any string works for synth).
+- [x] **CI coverage**: done, see `docs/ci.md`.
 - [ ] **Shared topology**: `nodeTopology()` in `local-kind` and the YAML in
       `userData()` describe the same nodes twice. A small shared package that
       emits both would keep them from drifting.

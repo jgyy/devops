@@ -197,7 +197,7 @@ export class DashboardStack extends TerraformStack {
                   : {}),
                 port: [{ containerPort: STEAMPIPE_PORT, name: "postgres" }],
                 readinessProbe: {
-                  tcpSocket: { port: String(STEAMPIPE_PORT) },
+                  tcpSocket: [{ port: String(STEAMPIPE_PORT) }],
                   initialDelaySeconds: 30,
                   periodSeconds: 10,
                 },

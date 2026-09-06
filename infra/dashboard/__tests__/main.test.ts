@@ -162,7 +162,7 @@ describe("Steampipe", () => {
     expect(container.command.join(" ")).toContain("steampipe plugin install aws");
     expect(container.command.join(" ")).toContain("--database-listen network");
     expect(container.port[0].container_port).toBe(STEAMPIPE_PORT);
-    expect(container.readiness_probe.tcp_socket.port).toBe(String(STEAMPIPE_PORT));
+    expect(container.readiness_probe.tcp_socket[0].port).toBe(String(STEAMPIPE_PORT));
   });
 
   it("takes its password from the shared Secret and the region from the ConfigMap", () => {
