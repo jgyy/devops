@@ -1,0 +1,36 @@
+{
+  "name": "aws-kind",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "description": "kind Kubernetes cluster on a single EC2 instance, defined with CDK for Terraform",
+  "main": "main.js",
+  "scripts": {
+    "get": "cdktf get",
+    "build": "tsc",
+    "synth": "cdktf synth",
+    "deploy": "cdktf deploy --auto-approve",
+    "destroy": "cdktf destroy --auto-approve",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.4.1",
+    "cdktf-cli": "^0.21.0",
+    "jest": "^30.5.1",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "cdktf": "^0.21.0",
+    "constructs": "^10.8.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@cdktf/node-pty-prebuilt-multiarch",
+      "@parcel/watcher",
+      "unrs-resolver"
+    ]
+  }
+}

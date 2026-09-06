@@ -1,7 +1,8 @@
 # Alternative tools
 
 The repository currently uses kind, Terraform, CDK for Terraform (TypeScript),
-Docker and a Makefile, with EKS as the planned cloud target. This page lists
+Docker and a Makefile, with the same kind cluster on a single EC2 instance as
+the cloud target. This page lists
 the main alternatives at each layer so the choices can be revisited later.
 Nothing here is planned; it is a reference for when a tool stops fitting.
 
@@ -10,14 +11,14 @@ flowchart TB
     subgraph current["Current stack"]
         kind["kind"] --> tf["Terraform"] --> cdktf["CDKTF (TypeScript)"]
         make["Makefile"] --> cdktf
-        eks["EKS (planned)"]
+        ec2["kind on EC2"]
     end
 
     kind -.->|swap| localalt["minikube · k3d · k3s · MicroK8s · Docker Desktop · Colima"]
     tf -.->|swap| iacalt["OpenTofu · Pulumi · Crossplane · CloudFormation / CDK"]
     cdktf -.->|swap| langalt["Plain HCL · Pulumi SDKs · Terragrunt"]
     make -.->|swap| taskalt["Taskfile · just · mise"]
-    eks -.->|swap| cloudalt["GKE · AKS · DigitalOcean · Civo · k3s on a VM"]
+    ec2 -.->|swap| cloudalt["EKS · GKE · AKS · DigitalOcean · Civo · k3s on a VM"]
 ```
 
 ## Local Kubernetes cluster (kind)
@@ -77,18 +78,22 @@ CDKTF alone (for plain HCL) keeps every provider and the state file.
 | [mise](https://mise.jdx.dev/) | Tool version manager plus tasks; can pin kind, terraform and node per project | Replacing the manual version table in `docs/local-cluster.md` |
 | pnpm scripts | Already present in `infra/local-kind/package.json` | Keeping everything inside the Node toolchain |
 
-## Cloud target (EKS, planned)
+## Cloud target (kind on EC2)
 
 | Option | Notes |
 | --- | --- |
+| EKS | Managed control plane and node groups, the "real" AWS answer; about USD 73/month for the control plane before any nodes. The natural upgrade once managed-Kubernetes practice matters more than cost |
+| EKS Auto Mode | EKS with AWS-managed nodes and add-ons; simplest operations, slightly higher per-node price |
 | GKE (Google Cloud) | Autopilot mode bills per pod, often cheaper than EKS for small clusters; free control plane on one zonal cluster |
 | AKS (Azure) | Free control plane, pay for nodes only |
 | DigitalOcean / Civo / Linode LKE | Managed Kubernetes with flat, predictable pricing; good for keeping cost down |
 | k3s on a single EC2 or Hetzner VM | Cheapest option; no managed control plane but the same IaC and add-on practice |
 | [LocalStack](https://localstack.cloud/) | Emulates AWS APIs locally; EKS emulation is a paid feature, so of limited use here |
 
-The EKS control plane alone costs around USD 73 per month, so for cost-driven
-practice a cheaper provider or a self-managed k3s VM may be worth considering.
+kind on one `t3a.large` was chosen because it reuses the local cluster's
+configuration and, with the one-hour auto-stop in `infra/aws-kind`, costs a
+few dollars a month. EKS is the obvious next step when a managed control plane
+is the thing being practised.
 
 ## CI/CD (planned)
 

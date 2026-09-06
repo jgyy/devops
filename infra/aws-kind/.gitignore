@@ -1,0 +1,10 @@
+node_modules/
+cdktf.out/
+.gen/
+*.js
+!jest.config.js
+!jest.setup.js
+*.d.ts
+terraform.*.tfstate*
+.terraform/
+kubeconfig

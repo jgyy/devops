@@ -1,0 +1,9 @@
+{
+  "language": "typescript",
+  "app": "pnpm exec ts-node main.ts",
+  "projectId": "devops-aws-kind",
+  "sendCrashReports": "false",
+  "terraformProviders": ["hashicorp/aws@~> 6.0"],
+  "terraformModules": [],
+  "context": {}
+}

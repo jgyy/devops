@@ -59,3 +59,23 @@ flowchart LR
       build artifact via `dagger call synth export` + `actions/upload-artifact`,
       and a `.github/dependabot.yml` covering GitHub Actions, `ci/` and
       `infra/local-kind`.
+
+## AWS cluster
+
+Deferred additions to `infra/aws-kind/`.
+
+- [ ] **Add-ons on AWS**: the ingress, metrics-server and sample-app items above
+      apply equally to `devops-aws`; the 80/443 port mappings are already in
+      place. Install through the systemd unit's script or a helm/kubernetes
+      provider pointed at the SSM tunnel.
+- [ ] **CI coverage**: parameterise `STACK_DIR` in `ci/src/index.ts` so
+      typecheck, test and synth also run for `infra/aws-kind` (synth needs a
+      `STATE_BUCKET` env var; any string works for synth).
+- [ ] **Shared topology**: `nodeTopology()` in `local-kind` and the YAML in
+      `userData()` describe the same nodes twice. A small shared package that
+      emits both would keep them from drifting.
+- [ ] **Elastic IP + Route 53**: a stable address for the ingress ports; costs
+      about USD 3.6/month while the instance is stopped.
+- [ ] **Spot instance**: `instance_market_options { market_type = "spot" }` on
+      the host would cut the hourly rate by roughly 60%, at the risk of the
+      session being interrupted.

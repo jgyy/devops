@@ -25,6 +25,7 @@ flowchart LR
 | `cat README.md` | Project purpose and the local-cluster overview |
 | `cat AGENTS.md` | Rules for AI coding agents, including the commit-message policy |
 | `cat docs/local-cluster.md` | How the kind cluster is built, prerequisites, usage |
+| `cat docs/aws-cluster.md` | How the AWS copy of the cluster is built, reached through SSM, and what it costs |
 | `cat docs/TODO.md` | Planned add-ons (ingress, metrics-server, registry, sample app) |
 | `git log --oneline` | Commit history |
 | `git status` | Working-tree state |
