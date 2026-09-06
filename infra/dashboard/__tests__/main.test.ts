@@ -3,6 +3,7 @@ import { Testing } from "cdktf";
 import {
   AWS_SECRET_NAME,
   CHART_VERSION,
+  dashboardFiles,
   DashboardStack,
   NAMESPACE,
   REGION,
@@ -170,8 +171,9 @@ describe("Steampipe", () => {
       name: STEAMPIPE_SECRET_NAME,
       key: "STEAMPIPE_DATABASE_PASSWORD",
     });
-    const cm = firstResource(parsed, "kubernetes_config_map_v1");
-    expect(cm.metadata.name).toBe("steampipe-config");
+    const cm = Object.values(parsed.resource.kubernetes_config_map_v1 as any).find(
+      (c: any) => c.metadata.name === "steampipe-config",
+    ) as any;
     expect(cm.data["aws.spc"]).toContain(`regions = ["${REGION}"]`);
     expect(container.volume_mount[0]).toMatchObject({
       mount_path: "/home/steampipe/.steampipe/config/aws.spc",
@@ -190,5 +192,38 @@ describe("Steampipe", () => {
     expect(svc.metadata.name).toBe("steampipe");
     expect(svc.spec.selector).toEqual({ app: "steampipe" });
     expect(svc.spec.port[0]).toMatchObject({ port: STEAMPIPE_PORT, target_port: String(STEAMPIPE_PORT) });
+  });
+});
+
+describe("dashboard ConfigMaps", () => {
+  const { parsed } = synthLocal();
+  const maps = Object.values(parsed.resource.kubernetes_config_map_v1 as any).filter((c: any) =>
+    c.metadata.name.startsWith("dashboard-"),
+  ) as any[];
+
+  it("creates one labelled ConfigMap per JSON file", () => {
+    expect(maps).toHaveLength(dashboardFiles().length);
+    expect(maps.length).toBeGreaterThan(0);
+    for (const cm of maps) {
+      expect(cm.metadata.labels).toEqual({ grafana_dashboard: "1" });
+      expect(cm.metadata.namespace).toBe(NAMESPACE);
+      for (const [file, body] of Object.entries(cm.data)) {
+        expect(file).toMatch(/\.json$/);
+        expect(() => JSON.parse(body as string)).not.toThrow();
+      }
+    }
+  });
+
+  it("ships the AWS resources dashboard using both AWS datasources", () => {
+    const cm = maps.find((c) => c.metadata.name === "dashboard-aws-resources");
+    const dashboard = JSON.parse(cm.data["aws-resources.json"]);
+    const uids = new Set(dashboard.panels.map((p: any) => p.datasource.uid));
+    expect(uids).toEqual(new Set(["cloudwatch", "steampipe"]));
+    const sql = dashboard.panels
+      .filter((p: any) => p.datasource.uid === "steampipe")
+      .map((p: any) => p.targets[0].rawSql as string);
+    for (const query of sql) {
+      expect(query).toContain("'Project' = 'devops'");
+    }
   });
 });

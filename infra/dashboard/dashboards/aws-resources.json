@@ -1,0 +1,78 @@
+{
+  "uid": "aws-resources",
+  "title": "AWS resources (Project=devops)",
+  "tags": ["aws"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "table", "title": "EC2 host",
+      "gridPos": { "x": 0, "y": 0, "w": 16, "h": 6 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "steampipe" },
+      "targets": [{ "refId": "A", "format": "table", "rawQuery": true,
+        "rawSql": "select tags ->> 'Name' as name, instance_id, instance_state as state, instance_type as type, public_ip_address as public_ip, launch_time from aws_ec2_instance where tags ->> 'Project' = 'devops' order by launch_time desc" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Current run cost (USD, t3a.large on-demand)",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 6 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "steampipe" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 2 } },
+      "targets": [{ "refId": "A", "format": "table", "rawQuery": true,
+        "rawSql": "select coalesce(sum(extract(epoch from (now() - launch_time)) / 3600.0), 0) * 0.08 as usd from aws_ec2_instance where tags ->> 'Project' = 'devops' and instance_state = 'running'" }]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "EC2 CPU utilization",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [{ "refId": "A", "queryMode": "Metrics", "metricQueryType": 0, "metricEditorMode": 0,
+        "region": "default", "namespace": "AWS/EC2", "metricName": "CPUUtilization",
+        "dimensions": { "InstanceId": "*" }, "statistic": "Average", "period": "60", "matchExact": false }]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "EC2 network in / out",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [
+        { "refId": "A", "queryMode": "Metrics", "metricQueryType": 0, "metricEditorMode": 0,
+          "region": "default", "namespace": "AWS/EC2", "metricName": "NetworkIn",
+          "dimensions": { "InstanceId": "*" }, "statistic": "Sum", "period": "60", "matchExact": false },
+        { "refId": "B", "queryMode": "Metrics", "metricQueryType": 0, "metricEditorMode": 0,
+          "region": "default", "namespace": "AWS/EC2", "metricName": "NetworkOut",
+          "dimensions": { "InstanceId": "*" }, "statistic": "Sum", "period": "60", "matchExact": false }
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "EC2 status checks failed",
+      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 6 },
+      "datasource": { "type": "cloudwatch", "uid": "cloudwatch" },
+      "targets": [{ "refId": "A", "queryMode": "Metrics", "metricQueryType": 0, "metricEditorMode": 0,
+        "region": "default", "namespace": "AWS/EC2", "metricName": "StatusCheckFailed",
+        "dimensions": { "InstanceId": "*" }, "statistic": "Maximum", "period": "60", "matchExact": false }]
+    },
+    {
+      "id": 6, "type": "table", "title": "VPC and subnets",
+      "gridPos": { "x": 8, "y": 14, "w": 16, "h": 6 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "steampipe" },
+      "targets": [{ "refId": "A", "format": "table", "rawQuery": true,
+        "rawSql": "select v.tags ->> 'Name' as vpc, v.vpc_id, v.cidr_block as vpc_cidr, s.subnet_id, s.cidr_block as subnet_cidr, s.availability_zone, s.map_public_ip_on_launch as public from aws_vpc v left join aws_vpc_subnet s on s.vpc_id = v.vpc_id where v.tags ->> 'Project' = 'devops'" }]
+    },
+    {
+      "id": 7, "type": "table", "title": "Security group rules",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 7 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "steampipe" },
+      "targets": [{ "refId": "A", "format": "table", "rawQuery": true,
+        "rawSql": "select g.group_name, r.type, r.ip_protocol, r.from_port, r.to_port, r.cidr_ipv4 from aws_vpc_security_group_rule r join aws_vpc_security_group g on g.group_id = r.group_id where g.tags ->> 'Project' = 'devops' order by g.group_name, r.type, r.from_port" }]
+    },
+    {
+      "id": 8, "type": "table", "title": "S3 buckets",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 7 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "steampipe" },
+      "targets": [{ "refId": "A", "format": "table", "rawQuery": true,
+        "rawSql": "select name, region, versioning_enabled as versioned, server_side_encryption_configuration is not null as encrypted, block_public_acls and block_public_policy and ignore_public_acls and restrict_public_buckets as public_access_blocked from aws_s3_bucket where tags ->> 'Project' = 'devops'" }]
+    }
+  ]
+}

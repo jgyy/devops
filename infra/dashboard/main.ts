@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { App, TerraformOutput, TerraformStack, TerraformVariable } from "cdktf";
 import { Construct } from "constructs";
@@ -90,6 +91,17 @@ export function grafanaValues(props: DashboardStackProps, adminPassword: string)
  */
 export function steampipeConfig(): string {
   return ['connection "aws" {', '  plugin  = "aws"', `  regions = ["${REGION}"]`, "}", ""].join("\n");
+}
+
+const DASHBOARD_DIR = path.resolve(__dirname, "dashboards");
+
+/** Every Grafana dashboard JSON committed next to this stack. */
+export function dashboardFiles(): string[] {
+  return fs
+    .readdirSync(DASHBOARD_DIR)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .map((f) => path.join(DASHBOARD_DIR, f));
 }
 
 export class DashboardStack extends TerraformStack {
@@ -214,6 +226,21 @@ export class DashboardStack extends TerraformStack {
       },
       dependsOn: [ns],
     });
+
+    // The Grafana sidecar picks up any ConfigMap in this namespace carrying
+    // the grafana_dashboard=1 label; one ConfigMap per committed JSON file.
+    for (const file of dashboardFiles()) {
+      const base = path.basename(file, ".json");
+      new ConfigMapV1(this, `dashboard_${base.replace(/-/g, "_")}`, {
+        metadata: {
+          name: `dashboard-${base}`,
+          namespace: NAMESPACE,
+          labels: { grafana_dashboard: "1" },
+        },
+        data: { [`${base}.json`]: fs.readFileSync(file, "utf8") },
+        dependsOn: [ns],
+      });
+    }
 
     new Release(this, "kube_prometheus_stack", {
       name: RELEASE_NAME,
